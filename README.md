@@ -12,7 +12,6 @@ Waydroid Helper is a graphical user interface application written in Python usin
   - See the [Key Mapping Guide](docs/KEY_MAPPING.md) for detailed instructions
 - Install extensions for Waydroid
   - [Magisk](https://github.com/topjohnwu/Magisk)
-  - ~~[Magisk](https://github.com/HuskyDG/magisk-files/)~~
   - [libhoudini](https://github.com/supremegamers/vendor_intel_proprietary_houdini)
   - [libndk](https://github.com/supremegamers/vendor_google_proprietary_ndk_translation-prebuilt)
   - [OpenGapps](https://sourceforge.net/projects/opengapps/)
