@@ -10,6 +10,7 @@ Waydroid Helper is a graphical user interface application written in Python usin
   - Customizable key bindings and layouts
   - Support for complex gaming scenarios (FPS, MOBA)
   - See the [Key Mapping Guide](docs/KEY_MAPPING.md) for detailed instructions
+- Gamepad Analog Stick
 - Install extensions for Waydroid
   - [Magisk](https://github.com/topjohnwu/Magisk)
   - [libhoudini](https://github.com/supremegamers/vendor_intel_proprietary_houdini)
