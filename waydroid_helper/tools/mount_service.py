@@ -74,7 +74,7 @@ class MountService(dbus.service.Object):
         target_str = os.path.realpath(str(target))
         try:
             result = subprocess.run(
-                ["fusermount", "-u", "-z", target_str], capture_output=True, text=True
+                ["umount", "-l", target_str], capture_output=True, text=True
             )
             return {
                 "returncode": result.returncode,

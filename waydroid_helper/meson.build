@@ -113,7 +113,17 @@ controller_android_sources = [
 ]
 
 controller_app_sources = [
+    'controller/app/input_event_factory.py',
+    'controller/app/mode_controller.py',
+    'controller/app/scrcpy_lifecycle.py',
+    'controller/app/widget_layout_service.py',
+    'controller/app/widget_capabilities.py',
+    'controller/app/widget_layout_key_codec.py',
+    'controller/app/widget_mapping_registrar.py',
+    'controller/app/widget_settings_popover.py',
+    'controller/app/widget_transparency_controller.py',
     'controller/app/window.py',
+    'controller/app/window_input_router.py',
     'controller/app/workspace_manager.py',
 ]
 
@@ -128,6 +138,7 @@ controller_core_sources = [
     'controller/core/event_bus.py',
     'controller/core/__init__.py',
     'controller/core/key_system.py',
+    'controller/core/runtime.py',
     'controller/core/server.py',
     'controller/core/types.py',
     'controller/core/utils.py',
@@ -168,6 +179,7 @@ controller_platform_x11_sources = [
 
 controller_ui_sources = [
     'controller/ui/__init__.py',
+    'controller/ui/layout_file_actions.py',
     'controller/ui/menus.py',
     'controller/ui/styles.py',
 ]
@@ -181,6 +193,11 @@ controller_widgets_sources = [
 controller_widgets_base_sources = [
     'controller/widgets/base/__init__.py',
     'controller/widgets/base/base_widget.py',
+    'controller/widgets/base/decorator_contracts.py',
+    'controller/widgets/base/edit_controls.py',
+    'controller/widgets/base/edit_interaction.py',
+    'controller/widgets/base/draw_overlay.py',
+    'controller/widgets/base/mode_layout.py',
 ]
 
 controller_widgets_components_sources = [
@@ -200,6 +217,9 @@ controller_widgets_decorators_sources = [
     'controller/widgets/decorators/__init__.py',
     'controller/widgets/decorators/base_decorator.py',
     'controller/widgets/decorators/editable.py',
+    'controller/widgets/decorators/editable_mapping.py',
+    'controller/widgets/decorators/editable_session.py',
+    'controller/widgets/decorators/resize_geometry.py',
     'controller/widgets/decorators/resizable.py',
 ]
 
