@@ -8,10 +8,12 @@ if TYPE_CHECKING:
 
 import cairo
 
-from waydroid_helper.controller.core import (ControllerRuntimeContext, Event,
-                                             EventType, KeyCombination,
-                                             EventBus, PointerIdManager)
-from waydroid_helper.controller.core.key_system import KeyRegistry
+from waydroid_helper.controller.core import (
+    ControllerRuntimeContext,
+    Event,
+    EventType,
+    KeyCombination,
+)
 from waydroid_helper.controller.core.handler.event_handlers import InputEvent
 from waydroid_helper.controller.widgets.base.base_widget import BaseWidget
 from waydroid_helper.controller.widgets.decorators import Editable
@@ -64,10 +66,8 @@ class CancelCasting(BaseWidget):
         height: int = 50,
         text: str = "",
         default_keys: "set[KeyCombination] | None" = None,
-        runtime_context: ControllerRuntimeContext | None = None,
-        event_bus: EventBus | None = None,
-        pointer_id_manager: PointerIdManager | None = None,
-        key_registry: KeyRegistry | None = None,
+        *,
+        runtime_context: ControllerRuntimeContext,
     ):
         # 初始化基类
         super().__init__(
@@ -81,9 +81,6 @@ class CancelCasting(BaseWidget):
             min_width=25,
             min_height=25,
             runtime_context=runtime_context,
-            event_bus = event_bus,
-            pointer_id_manager = pointer_id_manager,
-            key_registry = key_registry,
         )
         from waydroid_helper.controller.widgets.components.skill_casting import SkillCasting
         SkillCasting.cancel_button_widget["widget"] = self

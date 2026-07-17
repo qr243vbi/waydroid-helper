@@ -34,6 +34,9 @@ def test_default_mouse_handler_uses_injected_screen_geometry():
         screen_geometry=screen_geometry,
         pointer_id_manager=PointerIdManager(),
         key_registry=KeyRegistry(),
+        input_event_factory=object(),
+        key_mapping_service=object(),
+        is_edit_mode=lambda: True,
     )
     messages = []
     bus.subscribe(EventType.CONTROL_MSG, lambda event: messages.append(event.data))
@@ -59,6 +62,9 @@ def test_default_event_handler_uses_runtime_handler_config():
         screen_geometry=ScreenGeometry(),
         pointer_id_manager=PointerIdManager(),
         key_registry=KeyRegistry(),
+        input_event_factory=object(),
+        key_mapping_service=object(),
+        is_edit_mode=lambda: True,
         default_handler_config=DefaultHandlerRuntimeConfig(
             keyboard_inject_mode="raw",
             mouse_natural_scroll=False,

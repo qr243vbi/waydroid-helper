@@ -36,7 +36,10 @@ from waydroid_helper.controller.app.widget_settings_popover import (
 from waydroid_helper.controller.app.widget_transparency_controller import (
     WidgetTransparencyController,
 )
-from waydroid_helper.controller.app.window_input_router import WindowInputRouter
+from waydroid_helper.controller.app.window_input_router import (
+    WindowInputRouter,
+    WindowInputRouterDependencies,
+)
 from waydroid_helper.controller.app.workspace_manager import WorkspaceManager
 from waydroid_helper.controller.core import (
     ControllerRuntimeContext,
@@ -46,6 +49,7 @@ from waydroid_helper.controller.core import (
     EventType,
     KeyCombination,
     KeyRegistry,
+    PointerInputOwnership,
     ScreenGeometry,
     Server,
 )
@@ -178,7 +182,10 @@ class TransparentWindow(Adw.Window):
         self.event_bus = EventBus()
         self.screen_geometry = ScreenGeometry()
         self.pointer_id_manager = PointerIdManager()
+        self.pointer_input_ownership = PointerInputOwnership()
         self.key_registry = KeyRegistry(GdkKeySymbolResolver())
+        self.input_event_factory = GtkInputEventFactory(self, self.key_registry)
+        self.key_mapping_manager = KeyMappingManager(self.event_bus)
         self.config = RootConfig()
         # Handlers receive an immutable snapshot so controller input processing
         # stays independent from the persistence backend and from live UI state.
@@ -192,6 +199,10 @@ class TransparentWindow(Adw.Window):
             screen_geometry=self.screen_geometry,
             pointer_id_manager=self.pointer_id_manager,
             key_registry=self.key_registry,
+            input_event_factory=self.input_event_factory,
+            key_mapping_service=self.key_mapping_manager,
+            is_edit_mode=lambda: self.current_mode == self.EDIT_MODE,
+            pointer_input_ownership=self.pointer_input_ownership,
             default_handler_config=default_handler_config,
         )
 
@@ -230,8 +241,6 @@ class TransparentWindow(Adw.Window):
             subscriber=self,
         )
 
-        self.input_event_factory = GtkInputEventFactory(self, self.key_registry)
-        self.key_mapping_manager = KeyMappingManager(self.event_bus)
         self.widget_mapping_registrar = WidgetMappingRegistrar(
             self.register_widget_key_mapping
         )
@@ -259,9 +268,26 @@ class TransparentWindow(Adw.Window):
         self.connect("notify::current-mode", self._on_mode_changed)
 
         self.setup_window()
-        self.input_router = WindowInputRouter(self)
+        self.input_router = WindowInputRouter(
+            WindowInputRouterDependencies(
+                host=self,
+                get_current_mode=lambda: self.current_mode,
+                switch_mode=self.switch_mode,
+                toggle_widget_transparency=self.toggle_all_widgets_transparency,
+                clear_selections=self.clear_all_selections,
+                show_widget_creation_menu=self._show_widget_creation_menu,
+                mode_controller=self.mode_controller,
+                input_event_factory=self.input_event_factory,
+                event_handler_chain=self.event_handler_chain,
+                event_bus=self.event_bus,
+                workspace_manager=self.workspace_manager,
+            )
+        )
         self.input_router.install()
         GLib.idle_add(self.show_notification, _("Edit Mode (F1: Switch Mode)"))
+
+    def _show_widget_creation_menu(self, x: float, y: float) -> None:
+        self.menu_manager.show_widget_creation_menu(x, y, self.widget_factory)
 
     def _setup_notification_overlay(self, overlay: Gtk.Overlay) -> None:
         self.notification_label = Gtk.Label.new("")

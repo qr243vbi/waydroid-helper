@@ -11,16 +11,13 @@ from waydroid_helper.controller.android.input import (
     AMotionEventButtons,
 )
 from waydroid_helper.controller.core import (
+    ControllerRuntimeContext,
     Event,
     EventType,
     KeyCombination,
     is_point_in_rect,
-    PointerIdManager,
-    ControllerRuntimeContext,
 )
 from waydroid_helper.controller.core.control_msg import InjectTouchEventMsg
-from waydroid_helper.controller.core.event_bus import EventBus
-from waydroid_helper.controller.core.key_system import KeyRegistry
 from waydroid_helper.controller.platform import get_platform
 from waydroid_helper.controller.widgets import BaseWidget
 from waydroid_helper.controller.widgets.config import create_slider_config
@@ -73,10 +70,8 @@ class Aim(BaseWidget):
         height: int = 150,
         text: str = "",
         default_keys: set[KeyCombination] | None = None,
-        runtime_context: ControllerRuntimeContext | None = None,
-        event_bus: EventBus | None = None,
-        pointer_id_manager: PointerIdManager | None = None,
-        key_registry: KeyRegistry | None = None,
+        *,
+        runtime_context: ControllerRuntimeContext,
     ):
         super().__init__(
             x,
@@ -89,9 +84,6 @@ class Aim(BaseWidget):
             min_width=200,
             min_height=150,
             runtime_context=runtime_context,
-            event_bus=event_bus,
-            pointer_id_manager=pointer_id_manager,
-            key_registry=key_registry,
         )
 
         # 状态管理
@@ -251,21 +243,35 @@ class Aim(BaseWidget):
             logger.warning("Cannot lock pointer for Aim because no platform is available")
             return False
 
+        if not self.pointer_input_ownership.acquire(self):
+            logger.warning("Cannot lock pointer for Aim because pointer input is busy")
+            return False
+
         self.platform.set_relative_pointer_callback(self.on_relative_pointer_motion)
         if not self.platform.lock_pointer():
+            self.platform.set_relative_pointer_callback(None)
+            if self.pointer_input_ownership.release(self):
+                self._set_root_cursor("default")
             logger.warning("Platform refused to lock pointer for Aim")
             return False
 
         self._set_root_cursor("none")
         return True
 
-    def _unlock_pointer_for_aiming(self) -> None:
-        """Release Aim's relative-pointer ownership without changing logical aim."""
-        if self.platform:
-            self.platform.set_relative_pointer_callback(None)
-            self.platform.unlock_pointer()
+    def _unlock_pointer_for_aiming(self, *, release_ownership: bool = True) -> None:
+        """Destroy Aim's physical lock and optionally end logical capture.
 
-        self._set_root_cursor("default")
+        A Fire handoff destroys this Wayland constraint but transfers logical
+        ownership first. In that case the surface cursor must remain hidden until
+        Fire installs its own constraint.
+        """
+        try:
+            if self.platform:
+                self.platform.set_relative_pointer_callback(None)
+                self.platform.unlock_pointer()
+        finally:
+            if release_ownership and self.pointer_input_ownership.release(self):
+                self._set_root_cursor("default")
 
     def _cancel_tasks(self) -> None:
         """取消所有异步任务"""
@@ -628,7 +634,27 @@ class Aim(BaseWidget):
                 await self._send_touch_up(w, h)
                 self._current_pos = None
 
-            self._unlock_pointer_for_aiming()
+            next_owner = request.get("owner")
+            if next_owner is None or not self.pointer_input_ownership.transfer(
+                self, next_owner
+            ):
+                await self._set_state(AimState.AIMING)
+                self._complete_aim_control_request(request, False)
+                return
+
+            # The compositor constraint stays alive across Aim/Fire handoffs.
+            # Destroying it would briefly restore the hardware cursor even
+            # though logical ownership had already moved to Fire.
+            if self.platform is None:
+                await self._set_state(AimState.IDLE)
+                self.pointer_input_ownership.release(next_owner)
+                self._set_root_cursor("default")
+                self._complete_aim_control_request(request, False)
+                return
+
+            self.platform.set_relative_pointer_callback(None)
+            request["pointer_platform"] = self.platform
+            logger.debug("Aim handed its active pointer session to %s", type(next_owner).__name__)
             self._complete_aim_control_request(request, True)
 
         except asyncio.CancelledError:
@@ -648,14 +674,33 @@ class Aim(BaseWidget):
                 self._complete_aim_control_request(request, False)
                 return
 
-            await self._set_state(AimState.AIMING)
-            if not self._lock_pointer_for_aiming():
+            previous_owner = request.get("owner")
+            if previous_owner is None or not self.pointer_input_ownership.transfer(
+                previous_owner, self
+            ):
                 await self._set_state(AimState.IDLE)
                 self.event_bus.emit(
                     Event(type=EventType.AIM_RELEASED, source=self, data=None)
                 )
                 self._complete_aim_control_request(request, False)
                 return
+
+            pointer_platform = request.get("pointer_platform")
+            if pointer_platform is None:
+                self.pointer_input_ownership.release(self)
+                self._set_root_cursor("default")
+                await self._set_state(AimState.IDLE)
+                self.event_bus.emit(
+                    Event(type=EventType.AIM_RELEASED, source=self, data=None)
+                )
+                self._complete_aim_control_request(request, False)
+                return
+
+            await self._set_state(AimState.AIMING)
+            self.platform = pointer_platform
+            self.platform.set_relative_pointer_callback(self.on_relative_pointer_motion)
+            self._set_root_cursor("none")
+            logger.debug("Aim resumed the existing pointer session from %s", type(previous_owner).__name__)
 
             self._complete_aim_control_request(request, True)
 
@@ -679,7 +724,6 @@ class Aim(BaseWidget):
 
             # 停止运动处理器 - 设置状态为IDLE后，处理器会自动退出
             await self._stop_motion_processor()
-            self._unlock_pointer_for_aiming()
 
             # 如果有当前位置，发送UP事件
             if self._current_pos is not None:
@@ -687,6 +731,7 @@ class Aim(BaseWidget):
                 await self._send_touch_up(w, h)
                 self._current_pos = None
 
+            self._unlock_pointer_for_aiming()
             # 发送瞄准释放事件
             self.event_bus.emit(Event(type=EventType.AIM_RELEASED, source=self, data=None))
 

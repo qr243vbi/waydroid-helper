@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol
 
 import gi
 
@@ -19,11 +19,39 @@ from waydroid_helper.controller.core.utils import is_point_in_rect
 from waydroid_helper.util.log import logger
 
 
+class WorkspaceHost(Protocol):
+    """Window operations required by workspace interaction management.
+
+    WorkspaceManager owns selection, dragging, resizing, and deletion state. It
+    depends on this narrow host contract instead of the concrete controller
+    window, keeping unrelated window services outside the workspace boundary.
+    """
+
+    def create_widget_at_position(self, widget: Any, x: int, y: int) -> None: ...
+
+    def unregister_widget_key_mapping(self, widget: Any) -> bool: ...
+
+    def fixed_put(self, widget: Any, x: int, y: int) -> None: ...
+
+    def fixed_move(self, widget: Any, x: int, y: int) -> None: ...
+
+    def get_allocated_width(self) -> int: ...
+
+    def get_allocated_height(self) -> int: ...
+
+    def set_cursor(self, cursor: Gdk.Cursor | None) -> None: ...
+
+
 class WorkspaceManager:
     """处理编辑模式下的所有UI交互"""
 
-    def __init__(self, window, fixed_container, event_bus: EventBus):
-        self.window = window
+    def __init__(
+        self,
+        host: WorkspaceHost,
+        fixed_container,
+        event_bus: EventBus,
+    ):
+        self.host = host
         self.fixed = fixed_container
         self.event_bus = event_bus
 
@@ -66,7 +94,7 @@ class WorkspaceManager:
             logger.error("CREATE_WIDGET payload missing field: %s", exc)
             return
 
-        self.window.create_widget_at_position(widget, x, y)
+        self.host.create_widget_at_position(widget, x, y)
 
     def _on_delete_widget_requested(self, event: Event[Any]):
         """Delete-widget event adapter with payload validation."""
@@ -222,13 +250,13 @@ class WorkspaceManager:
         
         widget_bounds = capabilities.get_widget_bounds(self.dragging_widget)
         if widget_bounds:
-            window_width = self.window.get_allocated_width()
-            window_height = self.window.get_allocated_height()
+            window_width = self.host.get_allocated_width()
+            window_height = self.host.get_allocated_height()
             
             new_x = max(0, min(new_x, window_width - widget_bounds[2]))
             new_y = max(0, min(new_y, window_height - widget_bounds[3]))
         
-        self.window.fixed_move(self.dragging_widget, new_x, new_y)
+        self.host.fixed_move(self.dragging_widget, new_x, new_y)
         
         self.drag_start_x = x
         self.drag_start_y = y
@@ -262,7 +290,7 @@ class WorkspaceManager:
     def delete_specific_widget(self, widget):
         """删除特定的widget"""
         if widget and widget.get_parent() == self.fixed:
-            self.window.unregister_widget_key_mapping(widget)
+            self.host.unregister_widget_key_mapping(widget)
             self.fixed.remove(widget)
             
             # 如果删除的是当前正在操作的widget，清除状态
@@ -311,7 +339,7 @@ class WorkspaceManager:
         try:
             x, y = self.fixed.get_child_position(widget)
             self.fixed.remove(widget)
-            self.window.fixed_put(widget, x, y)
+            self.host.fixed_put(widget, x, y)
             self.dragging_widget = widget
         except Exception as e:
             logger.error(f"Error bringing widget to front safely: {e}")
@@ -335,7 +363,7 @@ class WorkspaceManager:
             selected_state = capabilities.is_selected(widget)
             
             self.fixed.remove(widget)
-            self.window.fixed_put(widget, x, y)
+            self.host.fixed_put(widget, x, y)
             
             current_state = capabilities.is_selected(widget)
             if current_state != selected_state:
@@ -358,11 +386,11 @@ class WorkspaceManager:
         """根据名称设置鼠标指针"""
         try:
             cursor = Gdk.Cursor.new_from_name(cursor_name)
-            self.window.set_cursor(cursor)
+            self.host.set_cursor(cursor)
         except Exception as e:
             logger.error(f"Failed to set cursor: {cursor_name}, error: {e}")
             try:
                 cursor = Gdk.Cursor.new_from_name("default")
-                self.window.set_cursor(cursor)
+                self.host.set_cursor(cursor)
             except Exception:
                 logger.exception("Failed to reset cursor to default")

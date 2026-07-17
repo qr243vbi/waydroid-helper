@@ -19,7 +19,12 @@ from .key_system import (
     KeySymbolResolver,
     KeyType,
 )
-from .runtime import ControllerRuntimeContext, DefaultHandlerRuntimeConfig, ScreenGeometry
+from .runtime import (
+    ControllerRuntimeContext,
+    DefaultHandlerRuntimeConfig,
+    PointerInputOwnership,
+    ScreenGeometry,
+)
 from .server import Server
 from .types import *
 from .utils import *
@@ -43,6 +48,7 @@ __all__ = [
     "KeySymbolResolver",
     "ControllerRuntimeContext",
     "DefaultHandlerRuntimeConfig",
+    "PointerInputOwnership",
     "ScreenGeometry",
     # 服务器
     "Server",

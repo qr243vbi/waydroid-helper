@@ -22,9 +22,18 @@ from waydroid_helper.controller.core.runtime import ControllerRuntimeContext
 class DefaultEventHandler(InputEventHandler):
     """默认事件处理器 - 处理未被widget处理的事件"""
 
+    _MOUSE_EVENT_TYPES = {
+        InputEventType.MOUSE_PRESS,
+        InputEventType.MOUSE_RELEASE,
+        InputEventType.MOUSE_MOTION,
+        InputEventType.MOUSE_SCROLL,
+        InputEventType.MOUSE_ZOOM,
+    }
+
     def __init__(self, runtime_context: ControllerRuntimeContext):
         super().__init__(EventHandlerPriority.LOWEST)
         self.name = "DefaultEventHandler"
+        self.pointer_input_ownership = runtime_context.pointer_input_ownership
 
         # 可配置的默认行为
         self.key_mappings: dict[str, Callable[[InputEvent], None]] = {}
@@ -67,6 +76,21 @@ class DefaultEventHandler(InputEventHandler):
     def handle_event(self, event: InputEvent) -> bool:
         """处理默认事件"""
         try:
+            # Aim and Fire consume relative pointer motion and emit Android
+            # finger events themselves. Treat their ownership as an exclusive
+            # route so the default handler cannot emit a second Android mouse
+            # stream from the same physical input.
+            if (
+                event.event_type in self._MOUSE_EVENT_TYPES
+                and self.pointer_input_ownership.blocks_default_mouse_input()
+            ):
+                logger.debug(
+                    "Default mouse input %s suppressed while pointer is owned by %s",
+                    event.event_type,
+                    self.pointer_input_ownership.owner_name(),
+                )
+                return True
+
             handler = self.handler_map.get(event.event_type, lambda x: False)
             return handler(event)
 

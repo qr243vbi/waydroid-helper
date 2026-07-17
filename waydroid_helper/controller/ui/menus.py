@@ -3,22 +3,56 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from gettext import gettext as _
-from typing import TYPE_CHECKING
+from typing import Any, Protocol
 
 import gi
 from gi.repository import Gdk, Gtk
 
-from waydroid_helper.controller.app.widget_layout_service import WidgetLayoutService
 from waydroid_helper.controller.ui.layout_file_actions import LayoutFileActions
 from waydroid_helper.util.log import logger
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 
-if TYPE_CHECKING:
-    from waydroid_helper.controller.app.window import TransparentWindow
-    from waydroid_helper.controller.widgets.factory import WidgetFactory
+
+class WidgetSource(Protocol):
+    def iter_widgets(self) -> Iterable[Any]: ...
+
+
+class ContextMenuHost(Protocol):
+    workspace_manager: WidgetSource
+
+    def create_widget_at_position(self, widget: Any, x: int, y: int) -> None: ...
+
+    def on_clear_widgets(self, button: Gtk.Button | None) -> None: ...
+
+
+class WidgetFactoryView(Protocol):
+    widget_classes: dict[str, type[Any]]
+
+    def get_available_types(self) -> list[str]: ...
+
+    def get_widget_metadata(self, widget_type: str) -> dict[str, Any]: ...
+
+    def create_widget(self, widget_type: str, **kwargs: Any) -> Any | None: ...
+
+    def reload_widgets(self) -> None: ...
+
+    def print_discovered_widgets(self) -> None: ...
+
+
+class WidgetLayoutOperations(Protocol):
+    def save_layout(self, file_path: str, widgets: Iterable[Any]) -> None: ...
+
+    def load_layout(
+        self,
+        file_path: str,
+        widget_factory: WidgetFactoryView,
+        clear_widgets: Callable[[], None],
+        create_widget_at_position: Callable[[Any, int, int], None],
+    ) -> int: ...
 
 
 class ContextMenuManager:
@@ -26,8 +60,8 @@ class ContextMenuManager:
 
     def __init__(
         self,
-        parent_window: "TransparentWindow",
-        layout_service: WidgetLayoutService,
+        parent_window: ContextMenuHost,
+        layout_service: WidgetLayoutOperations,
         file_actions: LayoutFileActions,
     ):
         self.parent_window = parent_window
@@ -39,7 +73,7 @@ class ContextMenuManager:
         self._tool_flow: "Gtk.FlowBox | None" = None
 
     def show_widget_creation_menu(
-        self, x: int, y: int, widget_factory: "WidgetFactory"
+        self, x: int, y: int, widget_factory: WidgetFactoryView
     ):
         if self._popover is None:
             self._create_popover()
@@ -115,7 +149,7 @@ class ContextMenuManager:
             child = next_child
 
     def _update_menu_content(
-        self, x: int, y: int, widget_factory: "WidgetFactory"
+        self, x: int, y: int, widget_factory: WidgetFactoryView
     ) -> None:
         self._clear_flow_box(self._flow_box)
         self._clear_flow_box(self._tool_flow)
@@ -127,7 +161,7 @@ class ContextMenuManager:
         self._populate_tool_buttons(widget_factory)
 
     def _populate_widget_buttons(
-        self, x: int, y: int, widget_factory: "WidgetFactory"
+        self, x: int, y: int, widget_factory: WidgetFactoryView
     ) -> None:
         filtered_types = []
         for widget_type in widget_factory.get_available_types():
@@ -163,7 +197,7 @@ class ContextMenuManager:
             )
             self._flow_box.append(button)
 
-    def _populate_tool_buttons(self, widget_factory: "WidgetFactory") -> None:
+    def _populate_tool_buttons(self, widget_factory: WidgetFactoryView) -> None:
         if self._tool_flow is None:
             return
 
@@ -187,7 +221,7 @@ class ContextMenuManager:
             self._tool_flow.append(button)
 
     def _create_widget_callback(
-        self, widget_type: str, x: int, y: int, widget_factory: "WidgetFactory"
+        self, widget_type: str, x: int, y: int, widget_factory: WidgetFactoryView
     ) -> None:
         try:
             widget = widget_factory.create_widget(widget_type, x=x, y=y)
@@ -196,7 +230,7 @@ class ContextMenuManager:
         except Exception:
             logger.exception("Error creating %s widget", widget_type)
 
-    def _refresh_widgets(self, widget_factory: "WidgetFactory") -> None:
+    def _refresh_widgets(self, widget_factory: WidgetFactoryView) -> None:
         widget_factory.reload_widgets()
         widget_factory.print_discovered_widgets()
 
@@ -211,7 +245,7 @@ class ContextMenuManager:
             )
         )
 
-    def _load_layout(self, widget_factory: "WidgetFactory") -> None:
+    def _load_layout(self, widget_factory: WidgetFactoryView) -> None:
         self.file_actions.load_layout(
             lambda path: self.layout_service.load_layout(
                 path,

@@ -12,12 +12,14 @@ if TYPE_CHECKING:
 
 from waydroid_helper.controller.android.input import (AMotionEventAction,
                                                       AMotionEventButtons)
-from waydroid_helper.controller.core import (Event, EventType, KeyCombination,
-                                             EventBus, PointerIdManager, KeyRegistry,
-                                             ControllerRuntimeContext)
+from waydroid_helper.controller.core import (
+    ControllerRuntimeContext,
+    Event,
+    EventType,
+    KeyCombination,
+)
 from waydroid_helper.controller.core.control_msg import InjectTouchEventMsg
 from waydroid_helper.controller.core.handler.event_handlers import InputEvent
-from waydroid_helper.controller.platform import get_platform
 from waydroid_helper.controller.widgets.base.base_widget import BaseWidget
 from waydroid_helper.controller.widgets.config import (
     create_dropdown_config,
@@ -53,16 +55,9 @@ class Fire(BaseWidget):
         height: int = 50,
         text: str = "",
         default_keys: set[KeyCombination]|None = None,
-        runtime_context: ControllerRuntimeContext | None = None,
-        event_bus: EventBus | None = None,
-        pointer_id_manager: PointerIdManager | None = None,
-        key_registry: KeyRegistry | None = None,
+        *,
+        runtime_context: ControllerRuntimeContext,
     ):
-        resolved_key_registry = (
-            runtime_context.key_registry if runtime_context is not None else key_registry
-        )
-        if resolved_key_registry is None:
-            raise ValueError("runtime_context or key_registry is required")
         # 初始化基类，传入默认按键
         super().__init__(
             x,
@@ -72,14 +67,11 @@ class Fire(BaseWidget):
             pgettext("Controller Widgets", "Fire"),
             text,
             set(
-                [KeyCombination([resolved_key_registry.get_by_name("Mouse_Left")])]
+                [KeyCombination([runtime_context.key_registry.get_by_name("Mouse_Left")])]
             ),
             min_width=25,
             min_height=25,
             runtime_context=runtime_context,
-            event_bus = event_bus,
-            pointer_id_manager = pointer_id_manager,
-            key_registry = key_registry,
         )
         self.aim_triggered: bool = False
         self._active_aim_source: Any | None = None
@@ -199,7 +191,9 @@ class Fire(BaseWidget):
         )
         
     def _on_mouse_button_changed(self, key: str, value: str, restoring: bool) -> None:
-        key_mapping_manager = self.get_root().key_mapping_manager
+        # Mapping ownership is injected with the widget runtime. The component
+        # never reaches through its GTK root to discover application services.
+        key_mapping_manager = self.runtime_context.key_mapping_service
         key_mapping_manager.unsubscribe(self)
         if value == "right":
             right_mouse_key = KeyCombination([self.key_registry.get_by_name("Mouse_Right")])
@@ -392,10 +386,17 @@ class Fire(BaseWidget):
         if self._drag_task and not self._drag_task.done():
             return
 
+        # GTK press and release callbacks may run before the newly-created task
+        # gets its first event-loop turn. Publish ACTIVATING synchronously so a
+        # very fast release is recorded as a pending drag release instead of
+        # falling through to the ordinary Fire UP path without a pointer id.
+        self._drag_state = FireDragState.ACTIVATING
         self._release_requested = False
         self._drag_task = asyncio.create_task(self._activate_drag_shot())
 
-    async def _wait_for_aim_handoff(self, event_type: EventType) -> bool:
+    async def _wait_for_aim_handoff(
+        self, event_type: EventType
+    ) -> dict[str, Any] | None:
         loop = asyncio.get_running_loop()
         future: asyncio.Future[bool] = loop.create_future()
         payload: dict[str, Any] = {
@@ -403,65 +404,68 @@ class Fire(BaseWidget):
             "target": self._active_aim_source,
             "future": future,
             "handled": False,
+            "pointer_platform": self.platform,
         }
 
         self.event_bus.emit(Event(event_type, self, payload))
         if not payload["handled"]:
-            return False
+            return None
 
         try:
-            return await asyncio.wait_for(future, timeout=0.5)
+            if not await asyncio.wait_for(future, timeout=0.5):
+                return None
+            return payload
         except asyncio.TimeoutError:
             logger.warning("Timed out waiting for %s", event_type.value)
-            return False
+            return None
 
-    def _request_aim_resume_without_wait(self) -> None:
+    def _request_aim_resume_without_wait(self) -> bool:
         payload: dict[str, Any] = {
             "owner": self,
             "target": self._active_aim_source,
             "handled": False,
+            "pointer_platform": self.platform,
         }
         self.event_bus.emit(Event(EventType.AIM_RESUME_REQUEST, self, payload))
+        return bool(payload["handled"])
 
-    def _get_platform(self) -> "PlatformBase | None":
-        if self.platform is not None:
-            return self.platform
-
-        root = self.get_root()
-        if root is None:
-            logger.warning("Cannot lock pointer for Fire because root window is missing")
-            return None
-
-        self.platform = get_platform(root)
-        if self.platform is None:
-            logger.warning("Cannot lock pointer for Fire because no platform is available")
-        return self.platform
-
-    def _lock_pointer_for_drag(self) -> bool:
-        platform = self._get_platform()
-        if platform is None:
-            return False
-
-        platform.set_relative_pointer_callback(self.on_relative_pointer_motion)
-        if not platform.lock_pointer():
-            logger.warning("Platform refused to lock pointer for Fire drag shot")
-            return False
-
+    def _set_root_cursor(self, cursor_name: str) -> None:
         root = self.get_root()
         if root:
             root = cast("Gtk.Window", root)
-            root.set_cursor_from_name("none")
+            root.set_cursor_from_name(cursor_name)
+
+    def _adopt_pointer_session_for_drag(self, pointer_platform: Any) -> bool:
+        """Route an already-locked Aim pointer session to Fire.
+
+        The Wayland locked-pointer object belongs to the overlay surface rather
+        than to an individual widget. Reusing it avoids an unlock/relock cycle
+        and therefore prevents the compositor from restoring the hardware
+        cursor during drag-shot activation.
+        """
+        if pointer_platform is None:
+            logger.warning("Fire did not receive Aim's active pointer session")
+            return False
+
+        if not self.pointer_input_ownership.acquire(self):
+            logger.warning("Cannot lock pointer for Fire because pointer input is busy")
+            return False
+
+        self.platform = pointer_platform
+        self.platform.set_relative_pointer_callback(self.on_relative_pointer_motion)
+        self._set_root_cursor("none")
+        logger.debug("Fire adopted Aim's existing pointer session")
         return True
 
     def _unlock_pointer_for_drag(self) -> None:
-        if self.platform is not None:
-            self.platform.set_relative_pointer_callback(None)
-            self.platform.unlock_pointer()
-
-        root = self.get_root()
-        if root:
-            root = cast("Gtk.Window", root)
-            root.set_cursor_from_name("default")
+        """Destroy the shared physical pointer session after Fire is done."""
+        try:
+            if self.platform is not None:
+                self.platform.set_relative_pointer_callback(None)
+                self.platform.unlock_pointer()
+        finally:
+            if self.pointer_input_ownership.release(self):
+                self._set_root_cursor("default")
 
     def _clear_motion_queue(self) -> None:
         while not self._motion_queue.empty():
@@ -558,13 +562,13 @@ class Fire(BaseWidget):
 
     async def _activate_drag_shot(self) -> None:
         """Own Fire press, Aim suspension, and pointer lock as one transaction."""
-        await self._set_drag_state(FireDragState.ACTIVATING)
         touch_down_sent = False
         pointer_locked = False
         aim_suspended = False
 
         try:
-            if not await self._wait_for_aim_handoff(EventType.AIM_SUSPEND_REQUEST):
+            handoff = await self._wait_for_aim_handoff(EventType.AIM_SUSPEND_REQUEST)
+            if handoff is None:
                 logger.warning("Fire drag shot could not suspend active Aim")
                 await self._set_drag_state(FireDragState.IDLE)
                 return
@@ -579,7 +583,9 @@ class Fire(BaseWidget):
                 await self._set_drag_state(FireDragState.IDLE)
                 return
 
-            if not self._lock_pointer_for_drag():
+            if not self._adopt_pointer_session_for_drag(
+                handoff.get("pointer_platform")
+            ):
                 await self._cleanup_drag_shot(
                     touch_down_sent=False,
                     pointer_locked=False,
@@ -681,13 +687,16 @@ class Fire(BaseWidget):
 
         self._drag_pos = None
 
-        if pointer_locked:
+        if pointer_locked and aim_suspended and self.platform is not None:
+            self.platform.set_relative_pointer_callback(None)
+        elif pointer_locked:
             self._unlock_pointer_for_drag()
 
         if aim_suspended:
             resumed = await self._wait_for_aim_handoff(EventType.AIM_RESUME_REQUEST)
-            if not resumed:
+            if resumed is None:
                 logger.warning("Fire drag shot ended but Aim did not resume")
+                self._unlock_pointer_for_drag()
 
     def _send_touch_event(
         self,
@@ -758,11 +767,13 @@ class Fire(BaseWidget):
         event: "InputEvent | None" = None,
     ):
         """当映射的按键被弹起时的行为 - 模拟释放效果（按键弹起）"""
-        state = self._drag_state
-        if state in {FireDragState.ACTIVATING, FireDragState.ACTIVE}:
-            asyncio.create_task(self._release_drag_shot())
-            return True
-        if state == FireDragState.RELEASING:
+        if self._drag_shot_enabled:
+            state = self._drag_state
+            if state in {FireDragState.ACTIVATING, FireDragState.ACTIVE}:
+                asyncio.create_task(self._release_drag_shot())
+            # Drag-shot owns the complete press lifecycle. Even if activation
+            # ended before this callback arrived, the release must not fall
+            # through to the ordinary Fire path and emit an unmatched UP.
             return True
 
         if not self.aim_triggered:
@@ -810,9 +821,13 @@ class Fire(BaseWidget):
             )
 
         if self._drag_state != FireDragState.IDLE:
-            self._unlock_pointer_for_drag()
-            if self.aim_triggered:
-                self._request_aim_resume_without_wait()
+            resume_aim = self.aim_triggered and self._active_aim_source is not None
+            if resume_aim and self.platform is not None:
+                self.platform.set_relative_pointer_callback(None)
+                if not self._request_aim_resume_without_wait():
+                    self._unlock_pointer_for_drag()
+            else:
+                self._unlock_pointer_for_drag()
             self._drag_state = FireDragState.IDLE
             self._drag_pos = None
 

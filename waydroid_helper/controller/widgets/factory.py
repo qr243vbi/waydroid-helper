@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class WidgetFactory:
     """动态组件工厂类"""
     
-    def __init__(self, runtime_context: "ControllerRuntimeContext | None" = None):
+    def __init__(self, runtime_context: "ControllerRuntimeContext"):
         self.runtime_context = runtime_context
         self.widget_classes: dict[str, type["BaseWidget"]] = {}
         self.widget_metadata: dict[str, dict[str, Any]] = {}
@@ -106,8 +106,10 @@ class WidgetFactory:
             raise ValueError(f"Unsupported widget type: {widget_type}. Available types: {available}")
         
         widget_class = self.widget_classes[widget_type]
-        if self.runtime_context is not None:
-            kwargs.setdefault("runtime_context", self.runtime_context)
+        # Widget creation has one production path: the factory always supplies
+        # the complete context assembled for its controller window. Callers may
+        # configure widget data, but they cannot replace shared runtime state.
+        kwargs["runtime_context"] = self.runtime_context
         
         try:
             widget = widget_class(**kwargs)

@@ -10,8 +10,6 @@ from enum import Enum
 from gettext import pgettext
 from typing import TYPE_CHECKING
 
-from waydroid_helper.controller.core.key_system import KeyRegistry
-
 if TYPE_CHECKING:
     from cairo import Context, Surface
     from waydroid_helper.controller.widgets.base.base_widget import EditableRegion
@@ -24,8 +22,6 @@ from waydroid_helper.controller.core import (
     Event,
     EventType,
     KeyCombination,
-    EventBus,
-    PointerIdManager,
     ControllerRuntimeContext,
 )
 from waydroid_helper.controller.core.control_msg import InjectTouchEventMsg
@@ -90,10 +86,8 @@ class RepeatedClick(BaseWidget):
         height: int = 50,
         text: str = "",
         default_keys: set[KeyCombination] | None = None,
-        runtime_context: ControllerRuntimeContext | None = None,
-        event_bus: EventBus | None = None,
-        pointer_id_manager: PointerIdManager | None = None,
-        key_registry: KeyRegistry | None = None,
+        *,
+        runtime_context: ControllerRuntimeContext,
     ):
         # 初始化基类，传入默认按键
         super().__init__(
@@ -107,9 +101,6 @@ class RepeatedClick(BaseWidget):
             min_width=25,
             min_height=25,
             runtime_context=runtime_context,
-            event_bus=event_bus,
-            pointer_id_manager=pointer_id_manager,
-            key_registry=key_registry,
         )
 
         # 设置配置项

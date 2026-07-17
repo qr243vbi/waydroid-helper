@@ -25,9 +25,12 @@ from cairo import FONT_SLANT_NORMAL, FONT_WEIGHT_BOLD
 
 from waydroid_helper.controller.android.input import (AMotionEventAction,
                                                       AMotionEventButtons)
-from waydroid_helper.controller.core import (ControllerRuntimeContext, Event,
-                                             EventType, KeyCombination,
-                                             EventBus, PointerIdManager, KeyRegistry)
+from waydroid_helper.controller.core import (
+    ControllerRuntimeContext,
+    Event,
+    EventType,
+    KeyCombination,
+)
 from waydroid_helper.controller.core.control_msg import InjectTouchEventMsg
 from waydroid_helper.controller.core.handler.event_handlers import (
     InputEvent,
@@ -127,10 +130,8 @@ class SkillCasting(BaseWidget):
         height: int = 150,
         text: str = "",
         default_keys: set[KeyCombination] | None = None,
-        runtime_context: ControllerRuntimeContext | None = None,
-        event_bus: EventBus | None = None,
-        pointer_id_manager: PointerIdManager | None = None,
-        key_registry: KeyRegistry | None = None,
+        *,
+        runtime_context: ControllerRuntimeContext,
     ):
         # 初始化基类，传入默认按键
         super().__init__(
@@ -144,9 +145,6 @@ class SkillCasting(BaseWidget):
             min_width=25,
             min_height=25,
             runtime_context=runtime_context,
-            event_bus=event_bus,
-            pointer_id_manager=pointer_id_manager,
-            key_registry=key_registry,
         )
 
         # 异步状态管理

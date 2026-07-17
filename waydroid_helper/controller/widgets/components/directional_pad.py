@@ -18,12 +18,9 @@ from waydroid_helper.controller.android.input import (AMotionEventAction,
 from waydroid_helper.controller.core import (
     ControllerRuntimeContext,
     KeyCombination,
-    KeyRegistry,
 )
 from waydroid_helper.controller.core.control_msg import InjectTouchEventMsg
-from waydroid_helper.controller.core.event_bus import (Event, EventType,
-                                                       EventBus)
-from waydroid_helper.controller.core.utils import PointerIdManager
+from waydroid_helper.controller.core.event_bus import Event, EventType
 from waydroid_helper.controller.widgets import BaseWidget
 from waydroid_helper.controller.widgets.config import create_dropdown_config
 from waydroid_helper.controller.widgets.decorators import (Editable, Resizable,
@@ -75,10 +72,8 @@ class DirectionalPad(BaseWidget):
         height: int = 150,
         text: str = "",
         direction_keys: dict[str, KeyCombination | None] | None = None,
-        runtime_context: ControllerRuntimeContext | None = None,
-        event_bus: EventBus | None = None,
-        pointer_id_manager: PointerIdManager | None = None,
-        key_registry: KeyRegistry | None = None,
+        *,
+        runtime_context: ControllerRuntimeContext,
     ):
         super().__init__(
             x,
@@ -90,9 +85,6 @@ class DirectionalPad(BaseWidget):
             min_width=60,
             min_height=60,
             runtime_context=runtime_context,
-            event_bus = event_bus,
-            pointer_id_manager = pointer_id_manager,
-            key_registry = key_registry,
         )
         self.direction_keys: dict[str, KeyCombination | None] = {
             "up": None,

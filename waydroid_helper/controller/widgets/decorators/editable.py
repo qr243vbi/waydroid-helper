@@ -9,8 +9,8 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import GLib, Gtk
 
-from waydroid_helper.controller.app.input_event_factory import GtkInputEventFactory
 from waydroid_helper.controller.core.handler import InputEventType
+from waydroid_helper.controller.core.runtime import WidgetInputEventFactory
 from waydroid_helper.util.log import logger
 
 from waydroid_helper.controller.widgets.base.draw_overlay import (
@@ -49,7 +49,7 @@ class EditableDecorator(WidgetDecorator, EditableWidgetBehavior):
         logger.debug("EditableDecorator initialized")
         self._mapping_registrar = EditableKeyMappingRegistrar(
             self._wrapped_widget,
-            self._get_toplevel_window,
+            self._wrapped_widget.runtime_context.key_mapping_service,
         )
         
         # Hook双击事件、键盘事件、鼠标事件和绘制函数
@@ -245,29 +245,9 @@ class EditableDecorator(WidgetDecorator, EditableWidgetBehavior):
         # 重绘组件
         self._wrapped_widget.queue_draw()
     
-    def _get_input_event_factory(self) -> GtkInputEventFactory:
-        """Return the window input adapter, or build one for detached widgets.
-
-        The fallback keeps tests and standalone widget construction working,
-        while normal windows still use the exact same adapter instance as
-        mapping mode.
-        """
-        window = self._get_toplevel_window()
-        if window is not None:
-            try:
-                factory = window.input_event_factory
-            except AttributeError:
-                logger.warning(
-                    "Top-level window %s has no input_event_factory",
-                    type(window).__name__,
-                )
-            else:
-                if isinstance(factory, GtkInputEventFactory):
-                    return factory
-        return GtkInputEventFactory(
-            self._wrapped_widget,
-            self._wrapped_widget.key_registry,
-        )
+    def _get_input_event_factory(self) -> WidgetInputEventFactory:
+        """Return the input adapter injected by the controller composition root."""
+        return self._wrapped_widget.runtime_context.input_event_factory
 
     def _create_capture_key_event(
         self,
@@ -401,30 +381,9 @@ class EditableDecorator(WidgetDecorator, EditableWidgetBehavior):
         elif result.register_widget_mappings:
             self._mapping_registrar.register_widget_mappings()
     
-    def _get_toplevel_window(self):
-        """获取顶级窗口"""
-        root = self._wrapped_widget.get_root()
-        if root and isinstance(root, Gtk.Window):
-            return root
-        return None
-
     def _is_toplevel_in_edit_mode(self) -> bool:
-        window = self._get_toplevel_window()
-        if window is None:
-            return True
-
-        try:
-            current_mode = window.current_mode
-            edit_mode = window.EDIT_MODE
-        except AttributeError:
-            logger.warning(
-                "Top-level window %s has no controller mode state",
-                type(window).__name__,
-            )
-            return True
-
-        if current_mode != edit_mode:
-            logger.debug("Not in edit mode(%s), skip capture", current_mode)
+        if not self._wrapped_widget.runtime_context.is_edit_mode():
+            logger.debug("Controller is not in edit mode; skip capture")
             return False
 
         return True
