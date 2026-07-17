@@ -24,9 +24,6 @@ from waydroid_helper.controller.app.input_event_factory import (
     GdkKeySymbolResolver,
     GtkInputEventFactory,
 )
-from waydroid_helper.controller.app.input_state_lifecycle import (
-    AndroidInputStateLifecycleService,
-)
 from waydroid_helper.controller.app.mode_controller import ModeController
 from waydroid_helper.controller.app.scrcpy_lifecycle import ScrcpyLifecycleService
 from waydroid_helper.controller.app.widget_layout_service import WidgetLayoutService
@@ -57,10 +54,8 @@ from waydroid_helper.controller.core.handler import (
     DefaultEventHandler,
     InputEventHandlerChain,
     KeyMappingEventHandler,
-    KeyMappingInputStateGate,
     KeyMappingManager,
 )
-from waydroid_helper.controller.core.input_state_server import AndroidInputStateServer
 from waydroid_helper.controller.core.utils import PointerIdManager
 from waydroid_helper.controller.ui.layout_file_actions import LayoutFileActions
 from waydroid_helper.controller.ui.menus import ContextMenuManager
@@ -242,26 +237,15 @@ class TransparentWindow(Adw.Window):
         )
         self.event_handler_chain = InputEventHandlerChain()
         self.key_mapping_handler = KeyMappingEventHandler(self.key_mapping_manager)
-        self.key_mapping_input_gate = KeyMappingInputStateGate(
-            self.event_bus,
-            self.key_mapping_handler,
-            self.key_mapping_manager,
-        )
         self.default_handler = DefaultEventHandler(self.runtime_context)
         self.event_handler_chain.add_handler(self.key_mapping_handler)
         self.event_handler_chain.add_handler(self.default_handler)
 
-        self.adb_helper = AdbHelper()
         self.server = Server("0.0.0.0", 10721, self.event_bus)
         self.scrcpy_lifecycle = ScrcpyLifecycleService(
             self.server,
-            self.adb_helper,
+            AdbHelper(),
             self.screen_geometry,
-        )
-        self.input_state_server = AndroidInputStateServer(self.event_bus)
-        self.input_state_lifecycle = AndroidInputStateLifecycleService(
-            self.input_state_server,
-            self.adb_helper,
         )
 
         self.mode_controller = ModeController(
@@ -305,7 +289,6 @@ class TransparentWindow(Adw.Window):
 
     def _on_close_request(self, window):
         async def close():
-            await self.cleanup_input_state()
             await self.close_server()
             await self.cleanup_scrcpy()
 
@@ -317,9 +300,6 @@ class TransparentWindow(Adw.Window):
 
     async def cleanup_scrcpy(self) -> None:
         await self.scrcpy_lifecycle.cleanup()
-
-    async def cleanup_input_state(self) -> None:
-        await self.input_state_lifecycle.cleanup()
 
     def setup_window(self) -> None:
         self.realize()
@@ -487,7 +467,6 @@ class KeyMapper(Adw.Application):
     async def _do_shutdown(self) -> None:
         if self.window:
             self.window.on_clear_widgets(None)
-            await self.window.cleanup_input_state()
             await self.window.close_server()
             await self.window.cleanup_scrcpy()
         self.quit()

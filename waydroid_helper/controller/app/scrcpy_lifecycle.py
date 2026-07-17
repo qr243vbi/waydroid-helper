@@ -26,7 +26,6 @@ class ScrcpyLifecycleService:
         self.server = server
         self.adb_helper = adb_helper
         self.screen_geometry = screen_geometry
-        self._remote_reverse_spec: str | None = None
         self.setup_task: asyncio.Task[None] = asyncio.create_task(self.setup())
 
     async def setup(self) -> None:
@@ -50,18 +49,10 @@ class ScrcpyLifecycleService:
                     await asyncio.sleep(RETRY_DELAY_SECONDS)
                     continue
 
-                if self._remote_reverse_spec:
-                    await self.adb_helper.remove_reverse_tunnel(
-                        self._remote_reverse_spec
-                    )
-                    self._remote_reverse_spec = None
-
                 scid, socket_name = self.adb_helper.generate_scid()
-                self._remote_reverse_spec = f"localabstract:{socket_name}"
                 if not await self.adb_helper.reverse_tunnel(
                     socket_name, self.server.port
                 ):
-                    self._remote_reverse_spec = None
                     await asyncio.sleep(RETRY_DELAY_SECONDS)
                     continue
 
@@ -83,5 +74,4 @@ class ScrcpyLifecycleService:
     async def cleanup(self) -> None:
         if not self.setup_task.done():
             self.setup_task.cancel()
-        if self._remote_reverse_spec:
-            await self.adb_helper.remove_reverse_tunnel(self._remote_reverse_spec)
+        await self.adb_helper.remove_reverse_tunnel()

@@ -7,12 +7,7 @@ from .event_handlers import (EventHandlerPriority, InputEvent,
                              InputEventHandler, InputEventHandlerChain,
                              InputEventSource, InputEventType,
                              InputModifierState)
-from .mapping import (
-    KeyMappingEventHandler,
-    KeyMappingInputStateGate,
-    KeyMappingManager,
-    KeyMappingTarget,
-)
+from .mapping import KeyMappingEventHandler, KeyMappingManager, KeyMappingTarget
 
 __all__ = [
     "InputEventHandler",
@@ -23,7 +18,6 @@ __all__ = [
     "InputModifierState",
     "InputEventHandlerChain",
     "KeyMappingEventHandler",
-    "KeyMappingInputStateGate",
     "DefaultEventHandler",
     "KeyMappingManager",
     "KeyMappingTarget",
