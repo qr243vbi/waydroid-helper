@@ -22,8 +22,8 @@ BuildRequires:  meson
 BuildRequires:  pkgconfig
 BuildRequires:  gcc
 BuildRequires:  python3-devel
-BuildRequires:  cairo-devel
-BuildRequires:  gtk4-devel
+BuildRequires:  pkgconfig(cairo)
+BuildRequires:  pkgconfig(gtk4)
 BuildRequires:  libadwaita-devel
 BuildRequires:  gobject-introspection-devel
 BuildRequires:  gettext
@@ -35,17 +35,12 @@ Requires:       gtk4
 Requires:       libadwaita
 Requires:       waydroid
 Requires:       fakeroot
-Requires:       python3-aiofiles
-Requires:       python3-httpx
-Requires:       python3-cairo
-Requires:       python3-gobject >= 3.50
-Requires:       python3-pywayland
-
-%if 0%{?suse_version}
-Requires:       python3-PyYAML
-%else
-Requires:       python3-yaml
-%endif
+Requires:       python3dist(aiofiles)
+Requires:       python3dist(httpx)
+Requires:       python3dist(pycairo)
+Requires:       python3dist(pygobject)
+Requires:       python3dist(pywayland)
+Requires:       python3dist(pyyaml)
 Requires:       android-tools
 
 Recommends:     bindfs
