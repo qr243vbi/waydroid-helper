@@ -424,6 +424,50 @@ msgstr ""
 msgid "Confirm"
 msgstr ""
 
+#: waydroid_helper/key_mapping_preference_dialog.py:102
+msgid "Default Input Handler"
+msgstr "預設輸入處理器"
+
+#: waydroid_helper/key_mapping_preference_dialog.py:103
+msgid "Configure default keyboard and mouse input behavior"
+msgstr "設定預設鍵盤與滑鼠輸入行為"
+
+#: waydroid_helper/key_mapping_preference_dialog.py:106
+msgid "Keyboard Inject Mode"
+msgstr "鍵盤注入模式"
+
+#: waydroid_helper/key_mapping_preference_dialog.py:107
+msgid "Keyboard injection mode"
+msgstr "鍵盤輸入注入模式"
+
+#: waydroid_helper/key_mapping_preference_dialog.py:110
+msgid "Mixed"
+msgstr "混合"
+
+#: waydroid_helper/key_mapping_preference_dialog.py:111
+msgid "Text"
+msgstr "文字"
+
+#: waydroid_helper/key_mapping_preference_dialog.py:112
+msgid "Raw"
+msgstr "原始"
+
+#: waydroid_helper/key_mapping_preference_dialog.py:120
+msgid "Natural Scroll"
+msgstr "自然捲動"
+
+#: waydroid_helper/key_mapping_preference_dialog.py:121
+msgid "Use natural mouse wheel scrolling"
+msgstr "使用滑鼠自然捲動"
+
+#: waydroid_helper/key_mapping_preference_dialog.py:132
+msgid "Mouse Hover"
+msgstr "滑鼠 hover"
+
+#: waydroid_helper/key_mapping_preference_dialog.py:133
+msgid "Enabling hover may affect key mapping"
+msgstr "開啟 hover 可能影響按鍵映射"
+
 #: waydroid_helper/key_mapping_preference_dialog.py:98
 msgid "Cage Settings"
 msgstr ""
@@ -790,6 +834,38 @@ msgstr ""
 msgctxt "Controller Widgets"
 msgid "Choose which mouse button to simulate for firing"
 msgstr ""
+
+#: waydroid_helper/controller/widgets/components/fire.py:150
+msgctxt "Controller Widgets"
+msgid "Enable Drag Shot"
+msgstr "啟用拖曳開火"
+
+#: waydroid_helper/controller/widgets/components/fire.py:154
+msgctxt "Controller Widgets"
+msgid ""
+"Let Fire own pointer lock while firing, so mouse movement drags the fire "
+"touch point."
+msgstr "開火時讓開火按鍵接管指標鎖定，使滑鼠移動拖曳開火觸點。"
+
+#: waydroid_helper/controller/widgets/components/fire.py:159
+msgctxt "Controller Widgets"
+msgid "Horizontal Sensitivity"
+msgstr "水平靈敏度"
+
+#: waydroid_helper/controller/widgets/components/fire.py:165
+msgctxt "Controller Widgets"
+msgid "Adjusts horizontal drag-shot movement"
+msgstr "調整拖曳開火的水平移動"
+
+#: waydroid_helper/controller/widgets/components/fire.py:171
+msgctxt "Controller Widgets"
+msgid "Vertical Sensitivity"
+msgstr "垂直靈敏度"
+
+#: waydroid_helper/controller/widgets/components/fire.py:177
+msgctxt "Controller Widgets"
+msgid "Adjusts vertical drag-shot movement"
+msgstr "調整拖曳開火的垂直移動"
 
 #. 组件元数据
 #: waydroid_helper/controller/widgets/components/macro.py:681

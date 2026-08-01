@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from waydroid_helper.controller.widgets.base.base_widget import EditableRegion
 
 from waydroid_helper.controller.core.handler.event_handlers import InputEvent
-from waydroid_helper.controller.core.utils import PointerIdManager
 
 from cairo import FontSlant, FontWeight
 from waydroid_helper.controller.core import (
@@ -28,8 +27,6 @@ from waydroid_helper.controller.core import (
     Event,
     EventType,
     KeyCombination,
-    EventBus,
-    KeyRegistry,
 )
 from waydroid_helper.controller.widgets.base.base_widget import BaseWidget
 from waydroid_helper.controller.widgets.config import create_textarea_config
@@ -704,10 +701,8 @@ class Macro(BaseWidget):
         height: int = 50,
         text: str = "",
         default_keys: set[KeyCombination] | None = None,
-        runtime_context: ControllerRuntimeContext | None = None,
-        event_bus: EventBus | None = None,
-        pointer_id_manager: PointerIdManager | None = None,
-        key_registry: KeyRegistry | None = None,
+        *,
+        runtime_context: ControllerRuntimeContext,
     ):
         # 初始化基类，传入默认按键
         super().__init__(
@@ -721,9 +716,6 @@ class Macro(BaseWidget):
             min_width=50,  # 固定大小
             min_height=50,  # 固定大小
             runtime_context=runtime_context,
-            event_bus=event_bus,
-            pointer_id_manager=pointer_id_manager,
-            key_registry=key_registry,
         )
         # 存储预解析的宏命令对象
         self.press_commands: list[Command] = []

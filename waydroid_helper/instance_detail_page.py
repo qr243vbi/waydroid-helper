@@ -9,8 +9,6 @@ from gettext import gettext as _
 import multiprocessing
 from typing import cast
 import asyncio
-import shutil
-import shlex
 
 import gi
 
@@ -37,7 +35,7 @@ from waydroid_helper.compat_widget.message_dialog import MessageDialog
 from waydroid_helper.props_page import PropsPage
 from waydroid_helper.extensions_page import ExtensionsPage
 from waydroid_helper.scripts_page import ScriptsPage
-import os
+from waydroid_helper.cage_command import build_cage_command
 from waydroid_helper.config.models import RootConfig
 
 
@@ -543,8 +541,14 @@ class InstanceDetailPage(NavigationPage):
         """打开按键映射窗口"""
         button.set_sensitive(False)
         try:
+            cage_command = None
             # 检查 cage 是否启用且 waydroid 已启动完成
             if self.config.cage.get_property("enabled"):
+                cage_command = build_cage_command(self.config.cage)
+                logger.debug(
+                    f"Starting Cage for key mapping: {cage_command.command_line}"
+                )
+
                 if (
                     self.waydroid.persist_props.get_property("boot_completed")
                     or self.waydroid.state == WaydroidState.RUNNING
@@ -558,18 +562,8 @@ class InstanceDetailPage(NavigationPage):
 
                 from waydroid_helper.util.subprocess_manager import SubprocessManager
                 sm = SubprocessManager()
-                width = self.config.cage.window_width
-                height = self.config.cage.window_height
-                logic_width = self.config.cage.logical_width
-                logic_height = self.config.cage.logical_height
-                socket_name = self.config.cage.socket_name
-                scale = self.config.cage.scale/100
-                refresh_rate = self.config.cage.refresh_rate
-                hide_titlebar_flag = "--hide-titlebar" if self.config.cage.hide_titlebar else ""
-                confine_pointer_flag = "--confine-pointer" if self.config.cage.confine_pointer else ""
-                
                 handle = await sm.start(
-                    f"{self.config.cage.executable_path} -W {width} -H {height} -w {logic_width} -h {logic_height} -S {socket_name} --scale {scale} --refresh-rate {refresh_rate} {hide_titlebar_flag} {confine_pointer_flag} -- waydroid show-full-ui",
+                    cage_command.command_line,
                     flag=True,
                     shell=False,
                 )
@@ -589,8 +583,8 @@ class InstanceDetailPage(NavigationPage):
 
             # 直接打开窗口
             if self._app:
-                if self.config.cage.enabled:
-                    display_name = self.config.cage.socket_name
+                if cage_command:
+                    display_name = cage_command.display_name
                 else:
                     display_name = self.get_display().get_name()
                 self.keymapper_proc = multiprocessing.get_context('spawn').Process(target=create_keymapper,

@@ -8,18 +8,10 @@ import asyncio
 import math
 from enum import Enum
 from gettext import pgettext
-from typing import TYPE_CHECKING, cast
-
-import gi
-
-from waydroid_helper.controller.core.key_system import KeyRegistry
-
-gi.require_version("GLib", "2.0")
-from gi.repository import GLib
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cairo import Context, Surface
-    from gi.repository import Gtk
     from waydroid_helper.controller.widgets.base.base_widget import EditableRegion
 
 from waydroid_helper.controller.android.input import (
@@ -30,8 +22,6 @@ from waydroid_helper.controller.core import (
     Event,
     EventType,
     KeyCombination,
-    EventBus,
-    PointerIdManager,
     ControllerRuntimeContext,
 )
 from waydroid_helper.controller.core.control_msg import InjectTouchEventMsg
@@ -96,10 +86,8 @@ class RepeatedClick(BaseWidget):
         height: int = 50,
         text: str = "",
         default_keys: set[KeyCombination] | None = None,
-        runtime_context: ControllerRuntimeContext | None = None,
-        event_bus: EventBus | None = None,
-        pointer_id_manager: PointerIdManager | None = None,
-        key_registry: KeyRegistry | None = None,
+        *,
+        runtime_context: ControllerRuntimeContext,
     ):
         # 初始化基类，传入默认按键
         super().__init__(
@@ -113,9 +101,6 @@ class RepeatedClick(BaseWidget):
             min_width=25,
             min_height=25,
             runtime_context=runtime_context,
-            event_bus=event_bus,
-            pointer_id_manager=pointer_id_manager,
-            key_registry=key_registry,
         )
 
         # 设置配置项
@@ -588,16 +573,6 @@ class RepeatedClick(BaseWidget):
     def _on_operating_method_changed(self, key: str, value: str, from_ui: bool) -> None:
         """操作方式配置变更回调"""
         self._update_config_visibility()
-
-    def create_config_ui(self) -> "Gtk.Widget":
-        """创建配置UI，重写以支持动态可见性"""
-        # 调用父类方法创建UI
-        ui_widget = self.get_config_manager().create_ui()
-
-        # 使用GLib.idle_add延迟设置可见性，确保UI完全初始化后再执行
-        GLib.idle_add(self._update_config_visibility)
-
-        return ui_widget
 
     def _update_config_visibility(self) -> None:
         """根据操作方式更新配置项的可见性"""

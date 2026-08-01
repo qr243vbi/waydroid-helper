@@ -3,13 +3,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from waydroid_helper.controller.core.runtime import WidgetKeyMappingService
 from waydroid_helper.util.log import logger
 
 if TYPE_CHECKING:
-    from gi.repository import Gtk
     from waydroid_helper.controller.core.key_system import KeyCombination
     from waydroid_helper.controller.widgets.base.base_widget import EditableRegion
 
@@ -26,21 +25,15 @@ class EditableKeyMappingRegistrar:
     def __init__(
         self,
         widget: Any,
-        get_toplevel_window: Callable[[], "Gtk.Window | None"],
+        key_mapping_service: WidgetKeyMappingService,
     ) -> None:
         self._widget = widget
-        self._get_toplevel_window = get_toplevel_window
+        self._key_mapping_service = key_mapping_service
 
     def update_global_mapping(self) -> None:
         """Refresh mappings after deleting the current captured key."""
         try:
-            key_mapping_manager = self._get_key_mapping_manager()
-            if key_mapping_manager is None:
-                logger.warning(
-                    "Skip global mapping update for %s: no key mapping manager",
-                    type(self._widget).__name__,
-                )
-                return
+            key_mapping_manager = self._key_mapping_service
 
             key_mapping_manager.unsubscribe(self._widget)
 
@@ -57,13 +50,7 @@ class EditableKeyMappingRegistrar:
     def register_widget_mappings(self) -> None:
         """Register the final keys captured by a single-region widget."""
         try:
-            key_mapping_manager = self._get_key_mapping_manager()
-            if key_mapping_manager is None:
-                logger.warning(
-                    "Skip key mapping registration for %s: no key mapping manager",
-                    type(self._widget).__name__,
-                )
-                return
+            key_mapping_manager = self._key_mapping_service
 
             key_mapping_manager.unsubscribe(self._widget)
 
@@ -94,14 +81,7 @@ class EditableKeyMappingRegistrar:
     ) -> None:
         """Replace old region-specific subscriptions with current keys."""
         try:
-            key_mapping_manager = self._get_key_mapping_manager()
-            if key_mapping_manager is None:
-                logger.warning(
-                    "Skip region key mapping registration for %s: "
-                    "no key mapping manager",
-                    type(self._widget).__name__,
-                )
-                return
+            key_mapping_manager = self._key_mapping_service
 
             for old_key_combination in original_keys:
                 key_mapping_manager.unsubscribe_key(self._widget, old_key_combination)
@@ -142,16 +122,3 @@ class EditableKeyMappingRegistrar:
 
         except Exception:
             logger.exception("Error registering region key mapping")
-
-    def _get_key_mapping_manager(self):
-        window = self._get_toplevel_window()
-        if window is None:
-            return None
-        try:
-            return window.key_mapping_manager
-        except AttributeError:
-            logger.warning(
-                "Top-level window %s has no key_mapping_manager",
-                type(window).__name__,
-            )
-            return None

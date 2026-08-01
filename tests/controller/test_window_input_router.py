@@ -6,7 +6,10 @@ gi.require_version("Gdk", "4.0")
 
 from gi.repository import Gdk
 
-from waydroid_helper.controller.app.window_input_router import WindowInputRouter
+from waydroid_helper.controller.app.window_input_router import (
+    WindowInputRouter,
+    WindowInputRouterDependencies,
+)
 
 
 class FakeModeController:
@@ -34,9 +37,27 @@ class FakeWindow:
         return True
 
 
+def make_router(window: FakeWindow) -> WindowInputRouter:
+    return WindowInputRouter(
+        WindowInputRouterDependencies(
+            host=object(),
+            get_current_mode=lambda: window.current_mode,
+            switch_mode=lambda mode: True,
+            toggle_widget_transparency=window.toggle_all_widgets_transparency,
+            clear_selections=lambda: None,
+            show_widget_creation_menu=lambda x, y: None,
+            mode_controller=window.mode_controller,
+            input_event_factory=window.input_event_factory,
+            event_handler_chain=object(),
+            event_bus=object(),
+            workspace_manager=object(),
+        )
+    )
+
+
 def test_mapping_mode_f12_toggles_widgets_before_key_mapping_dispatch():
     window = FakeWindow()
-    router = WindowInputRouter(window)
+    router = make_router(window)
 
     handled = router.on_global_key_press(None, Gdk.KEY_F12, 0, 0)
 
@@ -46,7 +67,7 @@ def test_mapping_mode_f12_toggles_widgets_before_key_mapping_dispatch():
 
 def test_mapping_mode_f12_release_is_consumed_without_toggling_again():
     window = FakeWindow()
-    router = WindowInputRouter(window)
+    router = make_router(window)
 
     handled = router.on_global_key_release(None, Gdk.KEY_F12, 0, 0)
 

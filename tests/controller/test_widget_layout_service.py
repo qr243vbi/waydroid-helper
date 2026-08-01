@@ -67,6 +67,9 @@ def make_service():
             screen_geometry=screen_geometry,
             pointer_id_manager=PointerIdManager(),
             key_registry=KeyRegistry(),
+            input_event_factory=object(),
+            key_mapping_service=object(),
+            is_edit_mode=lambda: True,
         )
     )
 

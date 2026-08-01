@@ -10,12 +10,7 @@ from typing import TYPE_CHECKING, Any, Callable, TypeVar, TypedDict, cast
 
 import gi
 
-from waydroid_helper.controller.core.key_system import KeyRegistry
-from waydroid_helper.controller.core.runtime import (
-    ControllerRuntimeContext,
-    ScreenGeometry,
-)
-from waydroid_helper.controller.core.utils import PointerIdManager
+from waydroid_helper.controller.core.runtime import ControllerRuntimeContext
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
@@ -23,7 +18,7 @@ gi.require_version("Gdk", "4.0")
 
 from gi.repository import Gdk, GObject, Gtk
 
-from waydroid_helper.controller.core import Event, EventType, KeyCombination, EventBus
+from waydroid_helper.controller.core import Event, EventType, KeyCombination
 from waydroid_helper.controller.widgets.base.edit_controls import (
     EditControls,
 )
@@ -93,10 +88,8 @@ class BaseWidget(Gtk.DrawingArea):
         default_keys:set[KeyCombination]|None=None,
         min_width:int=100,
         min_height:int=100,
-        runtime_context:ControllerRuntimeContext|None=None,
-        event_bus:EventBus|None=None,
-        pointer_id_manager:PointerIdManager|None=None,
-        key_registry:KeyRegistry|None=None,
+        *,
+        runtime_context: ControllerRuntimeContext,
     ):
         super().__init__()
 
@@ -142,20 +135,10 @@ class BaseWidget(Gtk.DrawingArea):
         # 添加事件控制器
         self.setup_event_controllers()
 
-        # 配置管理器
-        if runtime_context is None:
-            if not event_bus or not pointer_id_manager or not key_registry:
-                raise ValueError(
-                    "runtime_context is required unless event_bus, "
-                    "pointer_id_manager, and key_registry are provided"
-                )
-            runtime_context = ControllerRuntimeContext(
-                event_bus=event_bus,
-                screen_geometry=ScreenGeometry(),
-                pointer_id_manager=pointer_id_manager,
-                key_registry=key_registry,
-            )
-
+        # The composition root owns every runtime dependency. Widgets must not
+        # create isolated event buses, geometry, key registries, or pointer ID
+        # managers because those objects coordinate state across all widgets in
+        # the same controller window.
         self.runtime_context = runtime_context
         self.screen_geometry = runtime_context.screen_geometry
         event_bus = runtime_context.event_bus
@@ -174,6 +157,7 @@ class BaseWidget(Gtk.DrawingArea):
         self.config_manager = ConfigManager(event_bus)
         self.event_bus = event_bus
         self.pointer_id_manager = pointer_id_manager
+        self.pointer_input_ownership = runtime_context.pointer_input_ownership
         self.key_registry = key_registry
 
     def set_default_keys(self, default_keys: set[KeyCombination]):

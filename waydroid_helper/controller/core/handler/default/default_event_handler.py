@@ -8,8 +8,10 @@
 from waydroid_helper.util.log import logger
 from typing import Callable
 
-from waydroid_helper.controller.core.handler.default.default_key_handler import \
-    KeyboardDefault
+from waydroid_helper.controller.core.handler.default.default_key_handler import (
+    KeyboardDefault,
+    KeyInjectMode,
+)
 from waydroid_helper.controller.core.handler.default.default_mouse_handler import \
     MouseDefault
 from waydroid_helper.controller.core.handler.event_handlers import (
@@ -20,19 +22,32 @@ from waydroid_helper.controller.core.runtime import ControllerRuntimeContext
 class DefaultEventHandler(InputEventHandler):
     """默认事件处理器 - 处理未被widget处理的事件"""
 
+    _MOUSE_EVENT_TYPES = {
+        InputEventType.MOUSE_PRESS,
+        InputEventType.MOUSE_RELEASE,
+        InputEventType.MOUSE_MOTION,
+        InputEventType.MOUSE_SCROLL,
+        InputEventType.MOUSE_ZOOM,
+    }
+
     def __init__(self, runtime_context: ControllerRuntimeContext):
         super().__init__(EventHandlerPriority.LOWEST)
         self.name = "DefaultEventHandler"
+        self.pointer_input_ownership = runtime_context.pointer_input_ownership
 
         # 可配置的默认行为
         self.key_mappings: dict[str, Callable[[InputEvent], None]] = {}
         self.mouse_mappings: dict[int, Callable[[InputEvent], None]] = {}
+        default_config = runtime_context.default_handler_config
         self.keyboard_handler: KeyboardDefault = KeyboardDefault(
-            runtime_context.event_bus
+            runtime_context.event_bus,
+            self._resolve_keyboard_inject_mode(default_config.keyboard_inject_mode),
         )
         self.mouse_handler: MouseDefault = MouseDefault(
             runtime_context.event_bus,
             runtime_context.screen_geometry,
+            natural_scroll=default_config.mouse_natural_scroll,
+            mouse_hover=default_config.mouse_hover,
         )
         self.handler_map: dict[InputEventType | str, Callable[[InputEvent], bool]] = {
             InputEventType.KEY_PRESS: self._handle_default_key_press,
@@ -44,6 +59,16 @@ class DefaultEventHandler(InputEventHandler):
             InputEventType.MOUSE_ZOOM: self._handle_default_mouse_zoom,
         }
 
+    def _resolve_keyboard_inject_mode(self, config_value: str) -> KeyInjectMode:
+        inject_mode = KeyInjectMode.from_config_value(config_value)
+        if inject_mode.config_value != config_value:
+            logger.error(
+                "Unknown default keyboard inject mode %r; falling back to %s",
+                config_value,
+                inject_mode.config_value,
+            )
+        return inject_mode
+
     def can_handle(self, event: InputEvent) -> bool:
         """默认处理器可以处理所有事件"""
         return self.enabled
@@ -51,6 +76,21 @@ class DefaultEventHandler(InputEventHandler):
     def handle_event(self, event: InputEvent) -> bool:
         """处理默认事件"""
         try:
+            # Aim and Fire consume relative pointer motion and emit Android
+            # finger events themselves. Treat their ownership as an exclusive
+            # route so the default handler cannot emit a second Android mouse
+            # stream from the same physical input.
+            if (
+                event.event_type in self._MOUSE_EVENT_TYPES
+                and self.pointer_input_ownership.blocks_default_mouse_input()
+            ):
+                logger.debug(
+                    "Default mouse input %s suppressed while pointer is owned by %s",
+                    event.event_type,
+                    self.pointer_input_ownership.owner_name(),
+                )
+                return True
+
             handler = self.handler_map.get(event.event_type, lambda x: False)
             return handler(event)
 
