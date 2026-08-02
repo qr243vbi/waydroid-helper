@@ -1,7 +1,5 @@
 # Waydroid Helper
 
-**Language**: [English](README.md) | [中文](README_zh.md) | [Русский](README_ru.md)
-
 Waydroid Helper is a graphical user interface application written in Python using PyGObject. It provides a user-friendly way to configure Waydroid and install extensions, including Magisk and ARM translation.
 
 ## Features
@@ -12,9 +10,9 @@ Waydroid Helper is a graphical user interface application written in Python usin
   - Customizable key bindings and layouts
   - Support for complex gaming scenarios (FPS, MOBA)
   - See the [Key Mapping Guide](docs/KEY_MAPPING.md) for detailed instructions
+- Gamepad Analog Stick
 - Install extensions for Waydroid
   - [Magisk](https://github.com/topjohnwu/Magisk)
-  - ~~[Magisk](https://github.com/HuskyDG/magisk-files/)~~
   - [libhoudini](https://github.com/supremegamers/vendor_intel_proprietary_houdini)
   - [libndk](https://github.com/supremegamers/vendor_google_proprietary_ndk_translation-prebuilt)
   - [OpenGapps](https://sourceforge.net/projects/opengapps/)
@@ -23,6 +21,11 @@ Waydroid Helper is a graphical user interface application written in Python usin
   - [SmartDock](https://github.com/axel358/smartdock)
 
 ## Installation
+
+### OpenSUSE Build System (OpenSUSE, Fedora, Mageia, Debian, Ubuntu, Raspbian, Arch)
+[![build result](https://build.opensuse.org/projects/home:qr234vbi/packages/waydroid-helper/badge.svg?type=percent)](https://build.opensuse.org/package/show/home:qr243vbi/waydroid-helper)
+
+Visit [download page](https://software.opensuse.org/download/package?project=home:qr243vbi&package=waydroid-helper) for instructions
 
 ### Arch
 
@@ -79,6 +82,16 @@ sudo apt install waydroid-helper
 sudo dnf copr enable cuteneko/waydroid-helper
 sudo dnf install waydroid-helper
 ```
+
+#### Additional dependencies required for the Key Mapper
+
+The following packages are not included as dependencies in the DNF package but are required for the Key Mapper to work correctly on Fedora:
+
+- `vte291-gtk4`: GTK4-compatible VTE terminal widget (the package ships with a reference to `Vte 3.91` which requires this)
+- `python3-aiofiles` and `python3-httpx`: Python modules missing from DNF dependencies
+- `android-tools`: Provides ADB, required for the Key Mapper to communicate with Waydroid. Without this, the Key Mapper silently fails.
+
+> Tested on Fedora 43 x86_64, KDE Plasma, waydroid-helper 0.2.9
 
 ### Ubuntu
 
